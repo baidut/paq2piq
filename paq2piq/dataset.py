@@ -19,6 +19,26 @@ data = FLIVE(path_to_csv=p/'labels<=640_padded.csv',
              transform = transform.train_transform
              )
 data.__getitem__(1)
+
+##########################
+# %% convert FastIQA label
+##########################
+import pandas as pd
+from pathlib import Path
+
+p = Path('!data/FLIVE')
+df = pd.read_csv(p/'labels<=640_padded.csv')
+test_df = pd.read_csv(p/'labels>640.csv')
+
+train_df = df[~df['is_valid']]
+valid_df = df[df['is_valid']]
+
+len(train_df), len(valid_df)
+assert len(df['name_image'].unique()) == len(train_df) + len(valid_df)
+
+train_df.to_csv(p/'train.csv', index=False)
+valid_df.to_csv(p/'val.csv', index=False)
+test_df.to_csv(p/'test.csv', index=False)
 # %%
 """
 
