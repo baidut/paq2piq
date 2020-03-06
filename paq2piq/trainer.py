@@ -13,7 +13,6 @@ from .common import IQAMetric, Transform
 from .dataset import FLIVE
 from .model import RoIPoolModel
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__file__)
 
 """
@@ -34,6 +33,7 @@ get_dataloaders(path_to_save_csv=p,
 # %% test validate_and_test
 #########################
 
+logging.basicConfig(level=logging.INFO)
 from paq2piq.trainer import *
 p = Path('!data/FLIVE/release')
 validate_and_test(path_to_save_csv=p,
@@ -74,11 +74,10 @@ def validate_and_test(
     )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    criterion = torch.nn.MSELoss().to(device)
-
-    best_state = torch.load(path_to_model_state)
-
     model = RoIPoolModel().to(device)
+
+    criterion = model.criterion.to(device)
+    best_state = torch.load(path_to_model_state)
     model.load_state_dict(best_state["model"])
 
     model.eval()
@@ -120,7 +119,7 @@ def get_optimizer(optimizer_type: str, model: RoIPoolModel, init_lr: float) -> t
         raise ValueError(f"not such optimizer {optimizer_type}")
     return optimizer
 
-"""
+
 class Trainer:
     def __init__(
         self,
@@ -133,7 +132,7 @@ class Trainer:
         batch_size: int,
         init_lr: float,
         experiment_dir: Path,
-        drop_out: float,
+        # drop_out: float,
         optimizer_type: str,
     ):
 
@@ -155,7 +154,7 @@ class Trainer:
         self.optimizer = optimizer
 
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=self.optimizer, mode="min", patience=5)
-        self.criterion = EDMLoss().to(self.device)
+        self.criterion = model.criterion.to(self.device)
         self.model_type = model_type
 
         experiment_dir.mkdir(exist_ok=True, parents=True)
@@ -181,7 +180,7 @@ class Trainer:
                 logger.info(f"updated loss from {best_loss} to {val_loss}")
                 best_loss = val_loss
                 best_state = {
-                    "state_dict": self.model.state_dict(),
+                    "model": self.model.state_dict(), # compatible with fastai model
                     "model_type": self.model_type,
                     "epoch": e,
                     "best_loss": best_loss,
@@ -190,7 +189,7 @@ class Trainer:
 
     def train(self):
         self.model.train()
-        train_losses = AverageMeter()
+        train_loss = 0
         total_iter = len(self.train_loader.dataset) // self.train_loader.batch_size
 
         for idx, (x, y) in enumerate(self.train_loader):
@@ -198,17 +197,18 @@ class Trainer:
 
             x = x.to(self.device)
             y = y.to(self.device)
-            y_pred = self.model(x)
-            loss = self.criterion(p_target=y, p_estimate=y_pred)
+
+
             self.optimizer.zero_grad()
-
+            y_pred = self.model(x)
+            loss = self.criterion(y_pred, y)
             loss.backward()
-
             self.optimizer.step()
-            train_losses.update(loss.item(), x.size(0))
 
-            self.writer.add_scalar("train/current_loss", train_losses.val, self.global_train_step)
-            self.writer.add_scalar("train/avg_loss", train_losses.avg, self.global_train_step)
+            train_loss += loss #loss.item()
+
+            self.writer.add_scalar("train/current_loss", loss, self.global_train_step)
+            self.writer.add_scalar("train/avg_loss", train_loss/(idx+1), self.global_train_step)
             self.global_train_step += 1
 
             e = time.monotonic()
@@ -217,23 +217,28 @@ class Trainer:
                 eta = ((total_iter - idx) * log_time) / 60.0
                 print(f"iter #[{idx}/{total_iter}] " f"loss = {loss:.3f} " f"time = {log_time:.2f} " f"eta = {eta:.2f}")
 
-        return train_losses.avg
+        train_loss /= len(self.train_loader.dataset)
+        return train_loss
 
     def validate(self):
         self.model.eval()
-        validate_losses = AverageMeter()
+        val_loss = 0
+        val_metrics = IQAMetric()
 
         with torch.no_grad():
             for idx, (x, y) in enumerate(self.val_loader):
                 x = x.to(self.device)
                 y = y.to(self.device)
                 y_pred = self.model(x)
-                loss = self.criterion(p_target=y, p_estimate=y_pred)
-                validate_losses.update(loss.item(), x.size(0))
+                loss = self.criterion(y_pred, y)
+                val_loss += loss
+                self.writer.add_scalar("val/current_loss", loss, self.global_val_step)
+                self.writer.add_scalar("val/avg_loss", val_loss/(idx+1), self.global_val_step)
+                val_metrics.update(y, y_pred)
 
-                self.writer.add_scalar("val/current_loss", validate_losses.val, self.global_val_step)
-                self.writer.add_scalar("val/avg_loss", validate_losses.avg, self.global_val_step)
                 self.global_val_step += 1
 
-        return validate_losses.avg
-"""
+        val_loss /= len(val_loader.dataset)
+        self.writer.add_scalar("val/srcc", val_metrics.srcc, self.global_val_step)
+        self.writer.add_scalar("val/lcc", val_metrics.lcc, self.global_val_step)
+        return val_loss

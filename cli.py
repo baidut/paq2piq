@@ -64,11 +64,67 @@ def validate_model(path_to_model_state, path_to_save_csv, path_to_images, batch_
     )
     click.echo("Done!")
 
+"""
+# %%
+!/home/zq/.virtualenvs/gpu/bin/python
+!python /media/zq/Seagate/Git/paq2piq/cli.py train-model \
+--path_to_save_csv "!data/FLIVE/release" \
+--path_to_images "!data/FLIVE/release/images" \
+--experiment_dir "data/exp/t1-baseline" \
+--num_epoch 100 \
+--batch_size 64
+# sh train.sh
+# %%
+"""
+
+@click.command("train-model", short_help="Train model")
+@click.option("--path_to_save_csv", help="where save train.csv|val.csv|test.csv", required=True, type=Path)
+@click.option("--path_to_images", help="images directory", required=True, type=Path)
+@click.option("--experiment_dir", help="directory name to save all logs and weight", required=True, type=Path)
+@click.option("--model_type", help="res net model type", default="resnet18", type=str)
+@click.option("--batch_size", help="batch size", default=128, type=int)
+@click.option("--num_workers", help="number of reading workers", default=16, type=int)
+@click.option("--num_epoch", help="number of epoch", default=32, type=int)
+@click.option("--init_lr", help="initial learning rate", default=0.0001, type=float)
+# @click.option("--drop_out", help="drop out", default=0.5, type=float)
+@click.option("--optimizer_type", help="optimizer type", default="adam", type=str)
+@click.option("--seed", help="random seed", default=42, type=int)
+def train_model(
+    path_to_save_csv: Path,
+    path_to_images: Path,
+    experiment_dir: Path,
+    model_type: str,
+    batch_size: int,
+    num_workers: int,
+    num_epoch: int,
+    init_lr: float,
+    # drop_out: float,
+    optimizer_type: str,
+    seed: int,
+):
+    click.echo("Train and validate model")
+    set_up_seed(seed)
+    trainer = Trainer(
+        path_to_save_csv=path_to_save_csv,
+        path_to_images=path_to_images,
+        experiment_dir=experiment_dir,
+        model_type=model_type,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        num_epoch=num_epoch,
+        init_lr=init_lr,
+        # drop_out=drop_out,
+        optimizer_type=optimizer_type,
+    )
+    trainer.train_model()
+    click.echo("Done!")
+
 
 def main():
     init_logging()
     cli.add_command(get_image_score)
     cli.add_command(validate_model)
+    cli.add_command(train_model)
     cli()
 
 
