@@ -3,6 +3,9 @@ import torch
 from torchvision import transforms
 from scipy import stats
 
+# render_output
+import matplotlib.pyplot as plt
+
 IMAGE_NET_MEAN = [0.485, 0.456, 0.406]
 IMAGE_NET_STD = [0.229, 0.224, 0.225]
 
@@ -75,3 +78,25 @@ def format_output(global_score, local_scores=None):
         return {"global_score": float(global_score)}
     else:
         return {"global_score": float(global_score), "local_scores": local_scores}
+
+
+def render_output(input_image, output, vmin=0, vmax=100):
+    # QualityMap.plot
+    fig, axes = plt.subplots(1, 3, figsize=(12, 8 * 3))
+
+    axes[0].imshow(input_image)
+    axes[1].imshow(input_image)
+
+    # _, H, W = input_image.shape # fastai
+    W, H = input_image.size # PIL
+    h, w = output['local_scores'].shape
+    extent = (0, W // w * w, H // h * h, 0)
+
+    axes[1].imshow(output['local_scores'], alpha=0.8, cmap='magma',
+                   extent=extent, interpolation='bilinear')
+    axes[2].imshow(output['local_scores'], cmap='gray', extent=extent,
+                   vmin=vmin, vmax=vmax)
+
+    axes[0].set_title('Input image')
+    axes[1].set_title(f"Predicted: {output['global_score']:.2f}")
+    axes[2].set_title(f'Quality map {h}x{w}')

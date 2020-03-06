@@ -1,19 +1,25 @@
 from pathlib import Path
 
 import torch
-from PIL.Image import Image
+# from PIL.Image import Image
+from PIL import Image, ImageSequence
 from torchvision.datasets.folder import default_loader
 
-from .common import Transform, format_output
+from .common import Transform, format_output, render_output
 from .model import *
 
 """
-# %%
+#######################
+# %% show quality map
+#######################
+%matplotlib inline
 from paq2piq.inference_model import *;
 
 file = '/media/zq/Seagate/Git/fastiqa/images/Picture1.jpg'
 model = InferenceModel(RoIPoolModel(), 'paq2piq/RoIPoolModel.pth')
-model.predict_from_file(file)
+image = Image.open(file)
+output = model.predict_from_pil_image(image)
+render_output(image, output)
 # %%
 """
 
@@ -32,13 +38,21 @@ class InferenceModel:
         self.model = self.model.to(device)
         self.model.eval()
 
-    def predict_from_file(self, image_path: Path):
+    def predict_from_file(self, image_path: Path, render=False):
         image = default_loader(image_path)
         return self.predict(image)
 
     def predict_from_pil_image(self, image: Image):
         image = image.convert("RGB")
         return self.predict(image)
+
+    def predict_from_vid_file(self, vid_path: Path):
+        im = Image.open(vid_path)
+        index = 1
+        for frame in ImageSequence.Iterator(im):
+            frame.save("frame%d.png" % index)
+            index = index + 1
+        pass
 
     @torch.no_grad()
     def predict(self, image):
