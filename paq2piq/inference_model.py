@@ -4,8 +4,8 @@ import torch
 from PIL.Image import Image
 from torchvision.datasets.folder import default_loader
 
-from paq2piq.common import Transform, format_output
-from paq2piq.model import *
+from .common import Transform, format_output
+from .model import *
 
 """
 # %%
