@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torchvision as tv
 from torchvision.ops import RoIPool, RoIAlign
+import numpy as np
 
 """
 # %%
@@ -69,16 +70,13 @@ class RoIPoolModel(nn.Module):
         preds = self.head(feats)
         return preds.view(batch_size, -1)
 
-    def input_block_rois(self, blk_size=None, img_size=None, batch_size=1, include_image=True, cuda=True):
+    def input_block_rois(self, blk_size=None, img_size=None, batch_size=1, include_image=True, device=None):
         if img_size is None:
             img_size = [1, 1]
         if blk_size is None:
-            blk_size = [[2, 2], [4, 4], [8, 8], [16, 16]]
+            blk_size = [30, 30]
 
         a = [0, 0, img_size[1], img_size[0]] if include_image else []
-        for sz in blk_size:
-            a += get_blockwise_rois(sz, img_size)
-        t = tensor(a).float()
-        if cuda:
-            t = t.cuda()
+        a += get_blockwise_rois(blk_size, img_size)
+        t = torch.tensor(a).float().to(device)
         self.rois = t.unsqueeze(0).repeat(batch_size, 1, 1).view(batch_size, -1).view(-1, 4)

@@ -37,5 +37,8 @@ def set_up_seed(seed=42):
     np.random.seed(seed)
 
 
-def format_output(mean_score, std_score, prob):
-    return {"mean_score": float(mean_score), "std_score": float(std_score), "scores": [float(x) for x in prob]}
+def format_output(global_score, local_scores=None):
+    if local_scores is None:
+        return {"global_score": float(global_score)}
+    else:
+        return {"global_score": float(global_score), "local_scores": local_scores}

@@ -22,6 +22,8 @@ device = torch.device("cuda" if use_cuda else "cpu")
 
 
 class InferenceModel:
+    blk_size = [20, 20]
+
     def __init__(self, model, path_to_model_state: Path):
         self.transform = Transform().val_transform
         model_state = torch.load(path_to_model_state, map_location=lambda storage, loc: storage)
@@ -43,9 +45,9 @@ class InferenceModel:
         image = self.transform(image)
         image = image.unsqueeze_(0)
         image = image.to(device)
-        prob = self.model(image).data.cpu().numpy()[0]
+        self.model.input_block_rois(self.blk_size, [image.shape[-2], image.shape[-1]], device=device)
+        t = self.model(image).data.cpu().numpy()[0]
 
-        #mean_score = get_mean_score(prob)
-        #std_score = get_std_score(prob)
-        # qmat later
-        return prob #score
+        local_scores = np.reshape(t[1:], self.blk_size)
+        global_score = t[0]
+        return format_output(global_score, local_scores)
