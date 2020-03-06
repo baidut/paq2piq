@@ -12,6 +12,7 @@ from tqdm import tqdm
 from .common import IQAMetric, Transform
 from .dataset import FLIVE
 from .model import RoIPoolModel
+from .DiscriminativeLR import discriminative_lr_params
 
 logger = logging.getLogger(__file__)
 
@@ -148,12 +149,15 @@ class Trainer:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         model = RoIPoolModel().to(self.device)
-        optimizer = get_optimizer(optimizer_type=optimizer_type, model=model, init_lr=init_lr)
+        params, lr_arr, _ = discriminative_lr_params(model, slice(1e-5, 1e-3))
+        optimizer = torch.optim.SGD(params, lr=1e-3, momentum=0.9, weight_decay=1e-1)
+        # get_optimizer(optimizer_type=optimizer_type, model=model, init_lr=init_lr)
 
         self.model = model
         self.optimizer = optimizer
 
-        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=self.optimizer, mode="min", patience=5)
+        self.scheduler = torch.optim.lr_scheduler.CyclicLR(self.optimizer, base_lr=list(lr_arr), max_lr=list(lr_arr*100))
+        #torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=self.optimizer, mode="min", patience=5)
         self.criterion = model.criterion.to(self.device)
         self.model_type = model_type
 
