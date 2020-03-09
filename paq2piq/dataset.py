@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import Tuple
 
-import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
@@ -18,7 +17,7 @@ data = FLIVE(path_to_csv=p/'labels<=640_padded.csv',
              images_path=p/'<=640_padded',
              transform = transform.train_transform
              )
-data.__getitem__(1)
+data.__getitem__(555)
 
 ##########################
 # %% convert FastIQA label
@@ -44,6 +43,12 @@ test_df.to_csv(p/'test.csv', index=False)
 
 
 class FLIVE(Dataset):
+    fn_col = 'name_image'
+    label_cols = 'mos_image', 'mos_patch_1', 'mos_patch_2', 'mos_patch_3'
+    rois_cols = ['left_image', 'top_image', 'right_image', 'bottom_image',
+                 'left_patch_1', 'top_patch_1', 'right_patch_1', 'bottom_patch_1',
+                 'left_patch_2', 'top_patch_2', 'right_patch_2', 'bottom_patch_2',
+                 'left_patch_3', 'top_patch_3', 'right_patch_3', 'bottom_patch_3']
     def __init__(self, path_to_csv: Path, images_path: Path, transform):
         self.df = pd.read_csv(path_to_csv)
         self.images_path = images_path
@@ -52,13 +57,12 @@ class FLIVE(Dataset):
     def __len__(self) -> int:
         return self.df.shape[0]
 
-    def __getitem__(self, item: int) -> Tuple[torch.Tensor, np.ndarray]:
+    def __getitem__(self, item: int):
         row = self.df.iloc[item]
 
-        image_path = self.images_path / row["name_image"]
+        image_path = self.images_path / row[self.fn_col]
         image = default_loader(image_path)
-        x = self.transform(image)
+        x = self.transform(image), torch.Tensor([row[c] for c in self.rois_cols])
+        y = torch.Tensor([row[c] for c in self.label_cols])
 
-        mos_image = row['mos_image']
-
-        return x, mos_image
+        return x, y

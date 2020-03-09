@@ -36,6 +36,7 @@ def get_blockwise_rois(blk_size, img_size=None):
 
 class RoIPoolModel(nn.Module):
     rois = None
+    criterion = nn.MSELoss()
 
     def __init__(self, backbone='resnet18'):
         super().__init__()
@@ -44,6 +45,7 @@ class RoIPoolModel(nn.Module):
             cut = -2
             spatial_scale = 1/32
 
+        self.model_type = self.__class__.__name__
         self.body = nn.Sequential(*list(model.children())[:cut])
         self.head = nn.Sequential(
           AdaptiveConcatPool2d(),
@@ -58,14 +60,21 @@ class RoIPoolModel(nn.Module):
         )
         self.roi_pool = RoIPool((2,2), spatial_scale)
 
-    def forward(self, im_data):
+    def forward(self, x):
+        # compatitble with fastai model
+        if isinstance(x, list) or isinstance(x, tuple):
+            im_data, self.rois = x
+        else:
+            im_data = x
+
         feats = self.body(im_data)
         batch_size = im_data.size(0)
 
         if self.rois is not None:
-            n_output = int(self.rois.size(0) / batch_size)
+            rois_data = self.rois.view(-1, 4)
+            n_output = int(rois_data.size(0) / batch_size)
             idx = get_idx(batch_size, n_output, im_data.device)
-            indexed_rois = torch.cat((idx, self.rois), 1)
+            indexed_rois = torch.cat((idx, rois_data), 1)
             feats = self.roi_pool(feats, indexed_rois)
         preds = self.head(feats)
         return preds.view(batch_size, -1)

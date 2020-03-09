@@ -9,11 +9,13 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from .common import IQAMetric, Transform
+from .common import Transform
+from .metric import IQAMetric
 from .dataset import FLIVE
 from .model import RoIPoolModel
 from .DiscriminativeLR import discriminative_lr_params
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__file__)
 
 """
@@ -59,8 +61,8 @@ def get_dataloaders(
     train_loader = DataLoader(train_ds, batch_size=batch_size, num_workers=num_workers, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=batch_size, num_workers=num_workers, shuffle=False)
     # sizes are different, set batch size to 1
-    test_ds = DataLoader(test_ds, batch_size=1, num_workers=num_workers, shuffle=False)
-    return train_loader, val_loader, test_ds
+    test_loader = DataLoader(test_ds, batch_size=1, num_workers=num_workers, shuffle=False)
+    return train_loader, val_loader, test_loader
 
 
 def validate_and_test(
@@ -108,7 +110,7 @@ def validate_and_test(
     test_loss /= len(test_loader.dataset)
 
     logger.info(f"val loss={val_loss}, SRCC={val_metrics.srcc}, LCC={val_metrics.lcc};"
-                f"test loss{test_loss}, SRCC={test_metrics.srcc}, LCC={test_metrics.lcc};")
+                f"test loss={test_loss}, SRCC={test_metrics.srcc}, LCC={test_metrics.lcc};")
 
 
 def get_optimizer(optimizer_type: str, model: RoIPoolModel, init_lr: float) -> torch.optim.Optimizer:
@@ -175,7 +177,8 @@ class Trainer:
         for e in range(1, self.num_epoch + 1):
             train_loss = self.train()
             val_loss = self.validate()
-            self.scheduler.step(metrics=val_loss)
+            self.scheduler.step()
+            #self.scheduler.step(metrics=val_loss) # for lr_scheduler.ReduceLROnPlateau
 
             self.writer.add_scalar("train/loss", train_loss, global_step=e)
             self.writer.add_scalar("val/loss", val_loss, global_step=e)
@@ -212,7 +215,7 @@ class Trainer:
             train_loss += loss #loss.item()
 
             self.writer.add_scalar("train/current_loss", loss, self.global_train_step)
-            self.writer.add_scalar("train/avg_loss", train_loss/(idx+1), self.global_train_step)
+            #self.writer.add_scalar("train/avg_loss", train_loss/(idx+1), self.global_train_step)
             self.global_train_step += 1
 
             e = time.monotonic()
@@ -237,12 +240,12 @@ class Trainer:
                 loss = self.criterion(y_pred, y)
                 val_loss += loss
                 self.writer.add_scalar("val/current_loss", loss, self.global_val_step)
-                self.writer.add_scalar("val/avg_loss", val_loss/(idx+1), self.global_val_step)
+                #self.writer.add_scalar("val/avg_loss", val_loss/(idx+1), self.global_val_step)
                 val_metrics.update(y, y_pred)
 
                 self.global_val_step += 1
 
-        val_loss /= len(val_loader.dataset)
+        val_loss /= len(self.val_loader.dataset)
         self.writer.add_scalar("val/srcc", val_metrics.srcc, self.global_val_step)
         self.writer.add_scalar("val/lcc", val_metrics.lcc, self.global_val_step)
         return val_loss

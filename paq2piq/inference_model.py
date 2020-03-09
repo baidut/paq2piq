@@ -2,11 +2,13 @@ from pathlib import Path
 
 import torch
 # from PIL.Image import Image
-from PIL import Image, ImageSequence
+from PIL import Image
 from torchvision.datasets.folder import default_loader
 
 from .common import Transform, format_output, render_output
 from .model import *
+
+import cv2
 
 """
 #######################
@@ -21,6 +23,13 @@ image = Image.open(file)
 output = model.predict_from_pil_image(image)
 render_output(image, output)
 # %%
+
+################################
+# %% show quality map of a video
+################################
+
+# %%
+
 """
 
 use_cuda = torch.cuda.is_available()
@@ -44,6 +53,10 @@ class InferenceModel:
 
     def predict_from_pil_image(self, image: Image):
         image = image.convert("RGB")
+        return self.predict(image)
+
+    def predict_from_cv2_image(self, image):
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         return self.predict(image)
 
     def predict_from_vid_file(self, vid_path: Path):
