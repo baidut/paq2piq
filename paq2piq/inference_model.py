@@ -82,10 +82,10 @@ class InferenceModel:
         # normalize the global score
         x_mean, std_left, std_right = 72.59696108881171, 7.798274017370107, 4.118047289170692
         if global_score < x_mean:
-            x = 50 + 50*(global_score-x_mean)/(4*std_left)
+            x = x_mean + x_mean*(global_score-x_mean)/(4*std_left)
             if x < 0: x = 0
         elif global_score > x_mean:
-            x = 50 + 50*(global_score-x_mean)/(3*std_right)
+            x = x_mean + (100-x_mean)*(global_score-x_mean)/(4*std_right)
             if x > 100: x = 100
         else:
             x = 50
