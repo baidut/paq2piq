@@ -37,7 +37,8 @@ device = torch.device("cuda" if use_cuda else "cpu")
 
 
 class InferenceModel:
-    blk_size = [20, 20]
+    blk_size = 20, 20
+    categories = 'Bad', 'Poor', 'Fair', 'Good', 'Excellent'
 
     def __init__(self, model, path_to_model_state: Path):
         self.transform = Transform().val_transform
@@ -77,4 +78,19 @@ class InferenceModel:
 
         local_scores = np.reshape(t[1:], self.blk_size)
         global_score = t[0]
-        return format_output(global_score, local_scores)
+
+        # normalize the global score
+        x_mean, std_left, std_right = 72.59696108881171, 7.798274017370107, 4.118047289170692
+        if global_score < x_mean:
+            x = 50 + 50*(global_score-x_mean)/(4*std_left)
+            if x < 0: x = 0
+        elif global_score > x_mean:
+            x = 50 + 50*(global_score-x_mean)/(3*std_right)
+            if x > 100: x = 100
+        else:
+            x = 50
+        category = self.categories[int(x//20)]
+        return {"global_score": global_score,
+                "normalized_global_score": x,
+                "local_scores": local_scores,
+                "category": category}
