@@ -88,7 +88,7 @@ class InferenceModel:
             x = x_mean + (100-x_mean)*(global_score-x_mean)/(4*std_right)
             if x > 100: x = 100
         else:
-            x = 50
+            x = x_mean
         category = self.categories[int(x//20)]
         return {"global_score": global_score,
                 "normalized_global_score": x,
